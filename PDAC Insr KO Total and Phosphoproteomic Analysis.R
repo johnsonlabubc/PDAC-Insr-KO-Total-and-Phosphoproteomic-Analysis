@@ -1222,6 +1222,7 @@ df_pproteomics <- df_pproteomics[-1,]
 
 #select columns
 df_pproteomics <- df_pproteomics[, c("Gene", 
+                                     "Annotated Sequence", 
                                      "Master Protein Accessions", 
                                      "Positions in Master Proteins", 
                                      "(G12D_KO) / (G12D_WT)", 
