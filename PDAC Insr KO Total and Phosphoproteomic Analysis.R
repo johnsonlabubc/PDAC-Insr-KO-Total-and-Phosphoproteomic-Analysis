@@ -582,7 +582,6 @@ df_merge$Label[df_merge$`log2 (G12D_KO) / (G12D_WT)_phospho` > 5.7][duplicated(d
 #remove duplicate labels for log2FC < 5.7
 df_merge$Label[df_merge$`log2 (G12D_KO) / (G12D_WT)_phospho` < -5.7][duplicated(df_merge$Label[df_merge$`log2 (G12D_KO) / (G12D_WT)_phospho` < -5.7])] <- ""
 
-
 #create plot
 ggplot2::ggplot(df_merge, ggplot2::aes(x = `log2 (G12D_KO) / (G12D_WT)_total`, y = `log2 (G12D_KO) / (G12D_WT)_phospho`)) +
   
@@ -673,7 +672,6 @@ df_pproteomics$`log2 Fold Change (G12D_KO) / (G12D_WT)` <- log2(df_pproteomics$`
 df_pproteomics$`log2 Fold Change (G12D_HET) / (G12D_WT)` <- log2(df_pproteomics$`(G12D_HET) / (G12D_WT)`)
 df_pproteomics$`log2 Fold Change (G_KO) / (G_WT)` <- log2(df_pproteomics$`(G_KO) / (G_WT)`)
 df_pproteomics$`log2 Fold Change (G12D_WT) / (G_WT)` <- log2(df_pproteomics$`(G12D_WT) / (G_WT)`)
-
 
 #remove rows with no significant comparisons
 df_pproteomics <- df_pproteomics[rowSums(df_pproteomics[, grepl("Adj. P-Value", colnames(df_pproteomics))] < 0.05) > 0,]
@@ -1538,7 +1536,6 @@ df_protein_levels <- data.frame(`WT G` = rowMeans(df_total_proteomics[, c(11:30)
                                 `KO G12D` = rowMeans(df_total_proteomics[, c(11:30)][, grepl("KO_G12D_", colnames(df_total_proteomics)[c(11:30)])]),
                                 check.names = FALSE)
 
-
 #convert to Z-score matrix
 df_protein_levels$mean_all <- rowMeans(df_protein_levels[, c(1:5)])
 
@@ -1636,6 +1633,3 @@ grid::grid.text("Protein Z-Score",
                 x = 0.5,
                 y = -0.5,
                 gp = grid::gpar(fontsize = 11))
-
-
-
