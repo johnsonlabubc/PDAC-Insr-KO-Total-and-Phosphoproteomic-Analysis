@@ -156,10 +156,10 @@ df_total_proteomics <- cbind(df_total_proteomics[, c(1:2)],
 df_total_proteomics[, c(3:22)] <- sapply(df_total_proteomics[, c(3:22)], as.numeric)
 
 #select specific digestive enzymes
-df_total_proteomics <- df_total_proteomics[df_total_proteomics$`Gene Symbol` %in% c("Rnase1", "Cuzd1", "Cpa2", "Klk1", "Pnliprp2", "Cela3b", "Prss2", "Cela1", "Sycn", "Amy1", "Ctrb1", "Cel", "Amy2", "Cpa1", "Pnlip", "Pnliprp1", "Cela2a", "Pla2g1b", "Clps", "Ctrc"),]
+df_total_proteomics <- df_total_proteomics[df_total_proteomics$`Gene Symbol` %in% c("Rnase1", "Cuzd1", "Cpa2", "Klk1", "Pnliprp2", "Cela3b", "Prss2", "Cela1", "Sycn", "Amy1", "Ctrb1", "Cel", "Amy2", "Cpa1", "Pnlip", "Pnliprp1", "Cela2a", "Pla2g1b", "Clps", "Ctrc", "Rnase4", "Spink1"),]
 
 #select abundance columns
-df_protein_levels <- df_total_proteomics[, c(3:22)] %>% na.omit()
+df_protein_levels <- df_total_proteomics[, c(3:22)]
 
 #convert to Z-score matrix
 df_protein_levels$mean_all <- rowMeans(df_protein_levels[, c(1:20)])
