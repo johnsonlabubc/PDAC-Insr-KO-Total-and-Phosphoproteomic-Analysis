@@ -513,15 +513,20 @@ df_total_proteomics$`-log10 Adj. P-Value: (G12D_KO) / (G12D_WT)` <- -log10(df_to
 #subset for significance and select proteins
 df_total_proteomics <- subset(df_total_proteomics, `Adj. P-Value: (G12D_KO) / (G12D_WT)` < 0.05 | df_total_proteomics$`Gene Symbol` %in% c("Akt1", "Akt2"))
 
-#add network anchors
-anchors <- data.frame(`Gene Symbol` = c("Akt3", "Kras", "Igf1r", "Insr", "mTor", "Raf1", "Mapk1"),
-                      a = c("Q9WUA6", "P32883", "Q60751", "P15208", "Q9JLN9", "Q99N57", "P63085"), 
-                      b = "",
-                      c = "",
-                      d = "",
-                      e = "")
+#add anchors
+anchors <- df_total_proteomics[0,]
 
-colnames(anchors) <- colnames(df_total_proteomics)
+anchor_genes <- c("Akt3", "Kras", "Igf1r", "Insr", "mTor", "Raf1", "Mapk1")
+
+anchor_uniprot <- c("Q9WUA6", "P32883", "Q60751", "P15208", "Q9JLN9", "Q99N57", "P63085")
+
+anchors <- anchors[1:length(anchor_genes),]
+
+anchors[, 1:ncol(anchors)] <- ""
+
+anchors[, 1] <- anchor_genes
+
+anchors[, 2] <- anchor_uniprot
 
 df_total_proteomics <- rbind(df_total_proteomics, 
                              anchors)
@@ -534,19 +539,19 @@ df_string_network <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_to
 df_string_mapping <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_total_protein_G12D_WT_vs_KO sig string_mapping_uniprot.tsv", check.names = FALSE, sep = "\t")
 
 #select protein mapping columns
-df_string_mapping <- df_string_mapping[, c("queryItem", "preferredName")]
+df_string_mapping_1 <- df_string_mapping[, c("queryItem", "preferredName")]
 
 #rename column names
-colnames(df_string_mapping) <- c("queryItem2", "node2")
+colnames(df_string_mapping_1) <- c("queryItem2", "node2")
 
 #merge mapping to network
-df_string_network <- merge(df_string_network, df_string_mapping, by = c("node2"), all.x = TRUE)
+df_string_network <- merge(df_string_network, df_string_mapping_1, by = c("node2"), all.x = TRUE)
 
 #rename column names
-colnames(df_string_mapping) <- c("queryItem", "#node1")
+colnames(df_string_mapping_1) <- c("queryItem", "#node1")
 
 #merge mapping to network
-df_string_network <- merge(df_string_network, df_string_mapping, by = c("#node1"), all.x = TRUE)
+df_string_network <- merge(df_string_network, df_string_mapping_1, by = c("#node1"), all.x = TRUE)
 
 #replace mapped values with input values
 df_string_network$`#node1` <- df_string_network$queryItem
@@ -558,13 +563,13 @@ df_string_input <- df_total_proteomics[, c("Gene Symbol","Accession")]
 #rename column names
 colnames(df_string_input) <- c("queryItem2_gene", "node2")
 
-#merge input to network
+#merge input with network
 df_string_network <- merge(df_string_network, df_string_input[, c("queryItem2_gene", "node2")], by = "node2")
 
 #rename column names
 colnames(df_string_input) <- c("queryItem_gene", "#node1")
 
-#merge input to network
+#merge input with network
 df_string_network <- merge(df_string_network, df_string_input[, c("queryItem_gene", "#node1")], by = "#node1")
 
 #replace mapped values with input values
@@ -587,8 +592,54 @@ df_string_input <- subset(df_string_input, !`#node1` %in% c(df_string_network$`#
 #combine connected and unconnected protein
 df_string_network <- rbind(df_string_network, df_string_input)
 
-#export edge table to SCPC#46_03_Jim_Anni_pancreatic_cancer_total_protein_G12D_WT_vs_KO sig string_interactions remapped.tsv
+#export edge table to SCPC#46_03_Jim_Anni_pancreatic_cancer_total_protein_G12D_WT_vs_KO sig string_interactions remapped.tsv for Cytoscape input
 write.table(df_string_network)
+
+#select protein mapping columns
+df_string_mapping_2 <- df_string_mapping[, c("queryItem", "stringId", "preferredName")]
+
+#import exported table from STRING app in Cytoscape for cellular compartments
+df_string_cyto_table <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_total_protein_G12D_WT_vs_KO sig STRING network default node.csv", check.names = FALSE, sep = ",")[, 2:14]
+
+#create column with delimited list of compartments with the highest score
+for(n in 1:nrow(df_string_cyto_table)){
+  
+  max_value <- max(df_string_cyto_table[n, grepl("compartment::", colnames(df_string_cyto_table))], na.rm = TRUE)
+  
+  max_col <- sort(colnames(df_string_cyto_table)[which(df_string_cyto_table[n,] == max_value)])
+  
+  max_col <- gsub("compartment::", "", max_col)
+  
+  df_string_cyto_table$Cell_Compartment[n] <- paste(unlist(max_col), collapse = "; ")
+  
+}
+
+#change column name
+colnames(df_string_cyto_table)[which(colnames(df_string_cyto_table) == "name")] <- "stringId"
+
+#select protein mapping columns
+df_string_mapping_2 <- df_string_mapping[, c("queryItem", "stringId", "preferredName")]
+
+#merge mapping with compartments table
+df_string_cyto_table <- merge(df_string_cyto_table, df_string_mapping_2, by = c("stringId"), all = TRUE)
+
+#replace mapped values with input values
+df_string_cyto_table$`#node1` <- df_string_cyto_table$queryItem
+
+#change column name
+colnames(df_total_proteomics)[which(colnames(df_total_proteomics) == "Accession")] <- "#node1"
+
+#merge node tables with compartments table
+df_total_proteomics <- merge(df_total_proteomics, df_string_cyto_table, by = c("#node1"), all.x = TRUE)
+
+#switch first two column positions
+df_total_proteomics[, c("#node1", "Gene Symbol")] <- df_total_proteomics[, c("Gene Symbol", "#node1")]
+
+#change column name
+colnames(df_total_proteomics)[which(colnames(df_total_proteomics) == "Gene Symbol")] <- "Accession"
+
+#export node table to SCPC#46_03_Jim_Anni_pancreatic_cancer_total_protein_G12D_WT_vs_KO sig logFC and padj with locations
+write.table(df_total_proteomics)
 
 
 ## Fig 6B ##
@@ -907,8 +958,7 @@ ggplot2::ggplot(df_plot, ggplot2::aes(colour = Condition)) +
     panel.grid.minor = ggplot2::element_blank(),
     legend.text.align = 0,
     text = ggplot2::element_text(size = 12, colour = "black"),
-    aspect.ratio = 1 / 1
-  )
+    aspect.ratio = 1 / 1)
 
 
 ### Figure 7 ###
@@ -995,7 +1045,7 @@ ggplot(df_pproteomics, aes(x = log2FoldChange, y = transf.log.10.padj)) +
                   ylim = c(-1, 16.5), 
                   expand = FALSE, clip = "off") +
   
-  scale_color_manual(values = c("red", "blue", "grey"), #c("#44CC44", "#4B0092", "grey"),
+  scale_color_manual(values = c("red", "blue", "grey"),
                      labels = c(expression("Up in PK-"*italic("Insr")^"f/f"),
                                 expression("Down in PK-"*italic("Insr")^"f/f"),
                                 "ns")) +
@@ -1532,10 +1582,14 @@ df_pproteomics$`-log10 Adj. P-Value: (G12D_KO) / (G12D_WT)` <- -log10(df_pproteo
 df_pproteomics <- subset(df_pproteomics, df_pproteomics$`Adj. P-Value: (G12D_KO) / (G12D_WT)` < 0.05)
 
 #extract individual phospho-sites
+
+#remove everything except phospho-site info
 df_pproteomics$`Modifications in Master Proteins` <- gsub("(.*)xPhospho ", "", df_pproteomics$`Modifications in Master Proteins`)
 
+#extract phospho-site info from between square brackets
 df_pproteomics$`Modifications in Master Proteins` <- stringi::stri_join_list(regmatches(df_pproteomics$`Modifications in Master Proteins`, gregexpr("(?<=\\[).+?(?=\\])", df_pproteomics$`Modifications in Master Proteins`, perl = T)))
 
+#remove percent confidence notation that is in the parentheses
 df_pproteomics$`Modifications in Master Proteins` <- gsub("\\((.*?))", "", df_pproteomics$`Modifications in Master Proteins`)
 
 #create new row per new phospho-site
@@ -1561,11 +1615,15 @@ anchors <- df_pproteomics[0,]
 
 anchor_genes <- c("Akt3", "Kras", "Igf1r", "Insr", "mTor", "Raf1", "Mapk1")
 
+anchor_uniprot <- c("Q9WUA6", "P32883", "Q60751", "P15208", "Q9JLN9", "Q99N57", "P63085")
+
 anchors <- anchors[1:length(anchor_genes),]
 
 anchors[, 1:ncol(anchors)] <- ""
 
 anchors[, 1] <- anchor_genes
+
+anchors[, 5] <- anchor_uniprot
 
 df_pproteomics <- rbind(df_pproteomics, 
                         anchors)
@@ -1577,23 +1635,23 @@ colnames(df_pproteomics)[1] <- "#node1"
 write.table(df_pproteomics)
 
 #import STRING protein mapping and edge table output files
-df_string_network <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_interactions.tsv", check.names = FALSE, sep = "\t")
-df_string_mapping <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_mapping.tsv", check.names = FALSE, sep = "\t")
+df_string_network <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_interactions_uniprot.tsv", check.names = FALSE, sep = "\t")
+df_string_mapping <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_mapping_uniprot.tsv", check.names = FALSE, sep = "\t")
 
 #select name mapping columns
-df_string_mapping <- df_string_mapping[, c("queryItem", "preferredName")]
+df_string_mapping_1 <- df_string_mapping[, c("queryItem", "preferredName")]
 
 #rename column names
-colnames(df_string_mapping) <- c("queryItem2", "node2")
+colnames(df_string_mapping_1) <- c("queryItem2", "node2")
 
-#merge mapping to network
-df_string_network <- merge(df_string_network, df_string_mapping, by = c("node2"), all.x = TRUE)
+#merge mapping with network
+df_string_network <- merge(df_string_network, df_string_mapping_1, by = c("node2"), all.x = TRUE)
 
 #rename column names
-colnames(df_string_mapping) <- c("queryItem", "#node1")
+colnames(df_string_mapping_1) <- c("queryItem", "#node1")
 
-#merge mapping to network
-df_string_network <- merge(df_string_network, df_string_mapping, by = c("#node1"), all.x = TRUE)
+#merge mapping with network
+df_string_network <- merge(df_string_network, df_string_mapping_1, by = c("#node1"), all.x = TRUE)
 
 #replace mapped values with input values
 df_string_network$`#node1` <- df_string_network$queryItem
@@ -1629,14 +1687,17 @@ df_string_network <- rbind(df_string_network, df_string_network_sites)
 #remove duplicated rows
 df_string_network <- df_string_network[!duplicated(df_string_network),]
 
-#export edge table to SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_interactions remapped extra site nodes.tsv
+#export edge table to SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig string_interactions remapped extra site nodes.tsv for Cytoscape input
 write.table(df_string_network)
+
+#select name mapping columns
+df_string_mapping_2 <- df_string_mapping[, c("queryItem", "stringId", "preferredName")]
 
 #create phospho-site node data frame
 df_pproteomics_nodes_sites <- df_pproteomics_nodes
 
 #fill extra columns with blanks
-df_pproteomics_nodes[c(2:ncol(df_pproteomics_nodes))] <- ""
+df_pproteomics_nodes[c(2:4, 6:ncol(df_pproteomics_nodes))] <- ""
 
 #categorize node types
 df_pproteomics_nodes$Node_Type <- "Protein"
@@ -1646,8 +1707,45 @@ df_pproteomics_nodes_sites$Node_Type <- "Phospho-site"
 df_pproteomics_nodes$Node_Label <- df_pproteomics_nodes$`#node1`
 df_pproteomics_nodes_sites$Node_Label <- df_pproteomics_nodes_sites$Site
 
-#remove duplicate rows
-df_pproteomics_nodes <- df_pproteomics_nodes[!duplicated(df_pproteomics_nodes),]
+#import exported table from STRING app in Cytoscape for cellular compartments
+df_string_cyto_table <- read.csv(".\\Data\\SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig STRING network default node.csv", check.names = FALSE, sep = ",")[, 2:14]
+
+#create column with delimited list of compartments with the highest score
+for(n in 1:nrow(df_string_cyto_table)){
+  
+  max_value <- max(df_string_cyto_table[n, grepl("compartment::", colnames(df_string_cyto_table))], na.rm = TRUE)
+  
+  max_col <- sort(colnames(df_string_cyto_table)[which(df_string_cyto_table[n,] == max_value)])
+  
+  max_col <- gsub("compartment::", "", max_col)
+  
+  df_string_cyto_table$Cell_Compartment[n] <- paste(unlist(max_col), collapse = "; ")
+  
+}
+
+#change column name
+colnames(df_string_cyto_table)[which(colnames(df_string_cyto_table) == "name")] <- "stringId"
+
+#merge mapping with compartments table
+df_string_cyto_table <- merge(df_string_cyto_table, df_string_mapping_2, by = c("stringId"), all = TRUE)
+
+#replace mapped values with input values
+df_string_cyto_table$`#node1` <- df_string_cyto_table$queryItem
+
+#replace first column with UniProt
+df_pproteomics_nodes$`#node1` <- df_pproteomics_nodes$`Master Protein Accessions`
+
+#merge node tables with compartments table
+df_pproteomics_nodes <- merge(df_pproteomics_nodes, df_string_cyto_table, by = c("#node1"), all.x = TRUE)
+
+#replace first column with gene name
+df_pproteomics_nodes$`#node1` <- df_pproteomics_nodes$Node_Label
+
+#replace first column with UniProt
+df_pproteomics_nodes_sites$`#node1` <- df_pproteomics_nodes_sites$`Master Protein Accessions`
+
+#merge node tables with compartments table
+df_pproteomics_nodes_sites <- merge(df_pproteomics_nodes_sites, df_string_cyto_table, by = c("#node1"), all.x = TRUE)
 
 #replace node column with gene and site 
 df_pproteomics_nodes_sites$`#node1` <- df_pproteomics_nodes_sites$Sum_Index_Unique_Gene
@@ -1658,7 +1756,10 @@ df_pproteomics_nodes_sites <- subset(df_pproteomics_nodes_sites, !`#node1` == ""
 #add phospho-site and protein nodes to protein data frame
 df_pproteomics_nodes <- rbind(df_pproteomics_nodes_sites, df_pproteomics_nodes)
 
-#export node table to SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig node table with extra site nodes.tsv
+#remove duplicate rows
+df_pproteomics_nodes <- df_pproteomics_nodes[!duplicated(df_pproteomics_nodes),]
+
+#export node table to SCPC#46_03_Jim_Anni_pancreatic_cancer_phosphoproteomics_G12D_WT_vs_KO sig node table with extra site nodes.tsv for Cytoscape input
 write.table(df_pproteomics_nodes)
 
 
